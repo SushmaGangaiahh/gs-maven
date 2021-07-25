@@ -1,34 +1,33 @@
 pipeline {
-	agent none
-	stages {
-		stage("test: baseline (jdk8)") {
-			agent {
-				docker {
-					image 'adoptopenjdk/openjdk8:latest'
-					args '-v $HOME/.m2:/tmp/jenkins-home/.m2'
-				}
-			}
-			options { timeout(time: 30, unit: 'MINUTES') }
-			steps {
-				sh 'test/run.sh'
-			}
-		}
+    agent any
+    tools {
+        maven "MAVEN_HOME"
+    }
 
-	}
+    stages {
+        stage('scm checkout') {
+            steps {
+                checkout([$class: 'GitSCM', branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[credentialsId: 'Git_cred', url: 'https://github.com/SushmaGangaiahh/gs-maven.git']]])
+            }
+        }
+        stage('Build') {
+            steps {
+                sh '''
+                pwd
+                cd initial
+                pwd
+                mvn -Dmaven.test.failure.ignore=true clean package
+                '''
+            }
 
-	post {
-		changed {
-			script {
-				slackSend(
-						color: (currentBuild.currentResult == 'SUCCESS') ? 'good' : 'danger',
-						channel: '#sagan-content',
-						message: "${currentBuild.fullDisplayName} - `${currentBuild.currentResult}`\n${env.BUILD_URL}")
-				emailext(
-						subject: "[${currentBuild.fullDisplayName}] ${currentBuild.currentResult}",
-						mimeType: 'text/html',
-						recipientProviders: [[$class: 'CulpritsRecipientProvider'], [$class: 'RequesterRecipientProvider']],
-						body: "<a href=\"${env.BUILD_URL}\">${currentBuild.fullDisplayName} is reported as ${currentBuild.currentResult}</a>")
-			}
-		}
-	}
+            post {
+                // If Maven was able to run the tests, even if some of the test
+                // failed, record the test results and archive the jar file.
+                success {
+                    junit '**/target/surefire-reports/TEST-*.xml'
+                    archiveArtifacts 'target/*.jar'
+                }
+            }
+        }
+    }
 }
