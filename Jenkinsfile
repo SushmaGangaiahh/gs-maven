@@ -7,6 +7,11 @@ pipeline {
     stages {
         stage('scm checkout') {
             steps {
+                shell '''
+                mkdir gs-maven
+                cd gs-maven
+                pwd
+                '''
                 checkout([$class: 'GitSCM', branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[credentialsId: 'Git_cred', url: 'https://github.com/SushmaGangaiahh/gs-maven.git']]])
             }
         }
